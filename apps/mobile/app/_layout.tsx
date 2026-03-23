@@ -55,6 +55,8 @@ export default function RootLayout() {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="dog-setup" options={{ headerShown: false }} />
+      <Stack.Screen name="step/[id]" options={{ title: 'Training Step', headerBackTitle: 'Back' }} />
+      <Stack.Screen name="program/[id]" options={{ title: 'Program', headerBackTitle: 'Back' }} />
     </Stack>
   )
 }

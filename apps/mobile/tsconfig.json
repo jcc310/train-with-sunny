@@ -3,7 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@train-with-sunny/shared": ["../../packages/shared/types"]
     }
   }
 }
