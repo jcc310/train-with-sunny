@@ -1,0 +1,2 @@
+ALTER TABLE dogs ADD COLUMN birthday date;
+ALTER TABLE dogs DROP COLUMN age;
