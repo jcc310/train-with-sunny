@@ -9,7 +9,13 @@ import {
 } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { Dog, Training, TrainingProgram } from '@train-with-sunny/shared'
+import { CatalogProgram, Course, Dog, DogProgramProgress, Training, TrainingProgram } from '@train-with-sunny/shared'
+
+interface EnrolledCourse {
+  course: Course
+  programs: (CatalogProgram & { progress: DogProgramProgress | null; phaseCount: number })[]
+  expanded: boolean
+}
 
 interface TrainingWithCompletion extends Training {
   completedToday: boolean
@@ -32,6 +38,7 @@ export default function TrainingsScreen() {
   const [sections, setSections] = useState<ProgramSection[]>([])
   const [standaloneTrainings, setStandaloneTrainings] = useState<TrainingWithCompletion[]>([])
   const [availablePrograms, setAvailablePrograms] = useState<TrainingProgram[]>([])
+  const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([])
   const [loading, setLoading] = useState(true)
   const [completing, setCompleting] = useState<string | null>(null)
   const [enrolling, setEnrolling] = useState<string | null>(null)
@@ -53,6 +60,55 @@ export default function TrainingsScreen() {
     }
 
     setDog(dogData)
+
+    // Load catalog enrollments
+    const { data: courseEnrollments } = await supabase
+      .from('dog_course_enrollments')
+      .select('course_id, courses(*)')
+      .eq('dog_id', dogData.id)
+
+    if (courseEnrollments && courseEnrollments.length > 0) {
+      const courseIds = courseEnrollments.map((e: any) => e.course_id)
+      const [programsRes, progressRes] = await Promise.all([
+        supabase
+          .from('catalog_programs')
+          .select('*')
+          .in('course_id', courseIds)
+          .order('order_index'),
+        supabase
+          .from('dog_program_progress')
+          .select('*')
+          .eq('dog_id', dogData.id),
+      ])
+
+      const allPrograms: CatalogProgram[] = programsRes.data ?? []
+      const allProgress: DogProgramProgress[] = progressRes.data ?? []
+
+      // Fetch phase counts
+      const phaseCounts: Record<string, number> = {}
+      if (allPrograms.length > 0) {
+        const { data: phasesData } = await supabase
+          .from('program_phases')
+          .select('program_id')
+          .in('program_id', allPrograms.map(p => p.id))
+        for (const ph of phasesData ?? []) {
+          phaseCounts[ph.program_id] = (phaseCounts[ph.program_id] ?? 0) + 1
+        }
+      }
+
+      const courses: EnrolledCourse[] = courseEnrollments.map((e: any) => {
+        const course: Course = Array.isArray(e.courses) ? e.courses[0] : e.courses
+        const coursePrograms = allPrograms
+          .filter(p => p.course_id === e.course_id)
+          .map(p => ({
+            ...p,
+            progress: allProgress.find(pr => pr.program_id === p.id) ?? null,
+            phaseCount: phaseCounts[p.id] ?? 0,
+          }))
+        return { course, programs: coursePrograms, expanded: true }
+      })
+      setEnrolledCourses(courses)
+    }
 
     const [trainingsRes, completionsRes, allProgramsRes, dogProgramsRes] = await Promise.all([
       supabase
@@ -271,8 +327,82 @@ export default function TrainingsScreen() {
       className="flex-1 bg-white"
       contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 56, paddingBottom: 40 }}
     >
-      <Text className="text-2xl font-bold mb-1">Daily Training</Text>
+      <View className="flex-row items-center justify-between mb-1">
+        <Text className="text-2xl font-bold">Daily Training</Text>
+        <Pressable
+          onPress={() => router.push('/catalog')}
+          className="bg-indigo-50 border border-indigo-100 rounded-full px-3 py-1.5 active:opacity-70"
+        >
+          <Text className="text-indigo-600 text-sm font-medium">Browse Catalog</Text>
+        </Pressable>
+      </View>
       <Text className="text-gray-500 mb-6">{dog.name} · Level {dog.level}</Text>
+
+      {/* Enrolled catalog courses */}
+      {enrolledCourses.length > 0 && (
+        <View className="mb-2">
+          <Text className="text-base font-semibold text-gray-700 mb-3">Your Courses</Text>
+          {enrolledCourses.map(({ course, programs, expanded }) => {
+            const done = programs.filter(p => p.progress?.completed_at).length
+            const progress = programs.length > 0 ? done / programs.length : 0
+            return (
+              <View key={course.id} className="mb-4">
+                <Pressable
+                  onPress={() => setEnrolledCourses(prev =>
+                    prev.map(ec => ec.course.id === course.id ? { ...ec, expanded: !ec.expanded } : ec)
+                  )}
+                  className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-2 active:opacity-80"
+                >
+                  <View className="flex-row justify-between items-center mb-2">
+                    <Text className="font-semibold text-indigo-800 text-base flex-1 mr-2">{course.title}</Text>
+                    <Text className="text-indigo-500 text-sm mr-2">{done}/{programs.length}</Text>
+                    <Text className="text-indigo-400 text-sm">{expanded ? '▲' : '▼'}</Text>
+                  </View>
+                  <View className="bg-indigo-200 rounded-full h-2">
+                    <View className="bg-indigo-500 h-2 rounded-full" style={{ width: `${progress * 100}%` }} />
+                  </View>
+                </Pressable>
+
+                {expanded && programs.map(prog => {
+                  const isCompleted = !!prog.progress?.completed_at
+                  const currentPhase = prog.progress?.current_phase ?? 1
+                  return (
+                    <Pressable
+                      key={prog.id}
+                      onPress={() => router.push(`/skill/${prog.id}`)}
+                      className="bg-white border border-gray-200 rounded-xl px-4 py-3 mb-2 flex-row items-center active:opacity-70"
+                    >
+                      <View className={[
+                        'w-6 h-6 rounded-full items-center justify-center mr-3 flex-shrink-0',
+                        isCompleted ? 'bg-green-500' : 'bg-indigo-100',
+                      ].join(' ')}>
+                        {isCompleted
+                          ? <Text className="text-white text-xs font-bold">✓</Text>
+                          : <Text className="text-indigo-600 text-xs font-bold">{currentPhase}</Text>
+                        }
+                      </View>
+                      <View className="flex-1">
+                        <Text className={[
+                          'font-medium text-sm',
+                          isCompleted ? 'text-green-700' : 'text-gray-800',
+                        ].join(' ')}>
+                          {prog.title}
+                        </Text>
+                        {!isCompleted && prog.phaseCount > 0 && (
+                          <Text className="text-gray-400 text-xs mt-0.5">
+                            Phase {currentPhase} of {prog.phaseCount}
+                          </Text>
+                        )}
+                      </View>
+                      <Text className="text-gray-300 text-sm">›</Text>
+                    </Pressable>
+                  )
+                })}
+              </View>
+            )
+          })}
+        </View>
+      )}
 
       {sections.map(({ program, trainings, expanded }) => {
         const done = trainings.filter(t => t.completedToday).length
@@ -432,7 +562,7 @@ function TrainingRow({
         <Text
           className={[
             'font-semibold text-base',
-            training.completedToday ? 'text-green-700 line-through' : 'text-gray-800',
+            training.completedToday ? 'text-green-700' : 'text-gray-800',
           ].join(' ')}
         >
           {training.title}

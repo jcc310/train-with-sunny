@@ -40,6 +40,20 @@ export default function TabsLayout() {
           tabBarIcon: tabIcon('barbell', 'barbell-outline'),
         }}
       />
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          title: 'Calendar',
+          tabBarIcon: tabIcon('calendar', 'calendar-outline'),
+        }}
+      />
+      <Tabs.Screen
+        name="coach"
+        options={{
+          title: 'Coach',
+          tabBarIcon: tabIcon('chatbubble-ellipses', 'chatbubble-ellipses-outline'),
+        }}
+      />
     </Tabs>
   )
 }

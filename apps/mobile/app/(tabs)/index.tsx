@@ -314,7 +314,7 @@ function TrainingRow({
         <Text
           className={[
             'font-semibold text-base',
-            training.completedToday ? 'text-green-700 line-through' : 'text-gray-800',
+            training.completedToday ? 'text-green-700' : 'text-gray-800',
           ].join(' ')}
         >
           {training.title}

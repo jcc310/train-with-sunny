@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 
@@ -29,6 +29,14 @@ export default function LoginScreen() {
   }
 
   return (
+    <KeyboardAvoidingView
+      className="flex-1 bg-white"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
     <View className="flex-1 items-center justify-center bg-white px-6">
       <Text className="text-3xl font-bold mb-2">Train with Sunny</Text>
       <Text className="text-gray-500 mb-8">Sign in to your account</Text>
@@ -67,5 +75,7 @@ export default function LoginScreen() {
         <Text className="text-blue-500 font-semibold text-base">Create Account</Text>
       </TouchableOpacity>
     </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }
